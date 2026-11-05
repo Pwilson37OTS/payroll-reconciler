@@ -1,0 +1,16 @@
+[theme]
+primaryColor = "#2e7d32"
+base = "light"
+
+[browser]
+gatherUsageStats = false
+
+[server]
+# Payroll files can be a few MB; keep some headroom.
+maxUploadSize = 50
+# Listen on all interfaces so other machines on the LAN can reach the app at
+# http://<this-PC-IP>:8501. Access is restricted by the Windows Firewall
+# allowlist on this port (see INTERNAL_HOSTING.md), NOT by this binding.
+address = "0.0.0.0"
+port = 8501
+headless = true

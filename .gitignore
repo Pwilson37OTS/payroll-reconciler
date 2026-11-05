@@ -1,0 +1,36 @@
+# Secrets — never commit real credentials
+.streamlit/secrets.toml
+
+# Saved audits (local dev store; may contain payroll data). On the cloud deploy
+# history lives in Snowflake, not here.
+audit_store/
+
+# Source data — keep payroll/Bullhorn/QBO exports out of git by default...
+*.xlsm
+*.xlsx
+*.csv
+
+# ...EXCEPT the curated files bundled into data/ for the Streamlit Cloud deploy.
+# refresh_data.ps1 copies these from the SharePoint-synced folder and pushes them.
+# Only these three are allowed in — nothing else.
+!data/
+!data/payroll_register.xlsx
+!data/C2C - CTS.xlsx
+!data/C2C - OTS.xlsx
+
+# tests fixtures are fine to commit
+!tests/**
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

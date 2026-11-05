@@ -1,0 +1,16 @@
+# Pinned for Streamlit Community Cloud. Streamlit is pinned exactly so a cloud
+# redeploy can't pull a newer version than the code was written against (that has
+# broken render calls on other OakTree apps). pandas/openpyxl are bounded below
+# the next major so they stay installable across the cloud's Python version.
+streamlit==1.56.0
+pandas>=2.2,<3.1
+openpyxl>=3.1,<4
+
+# Bullhorn is pulled live from BULLHORN_MIRROR (Snowflake), and saved audit
+# history is persisted to Snowflake on the cloud deploy. cryptography converts
+# the key-pair PEM (pasted into Secrets) to the DER bytes the connector wants.
+snowflake-connector-python[pandas]>=3.12
+cryptography>=42.0
+
+# CI only
+pytest>=8.0

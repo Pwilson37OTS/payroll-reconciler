@@ -563,13 +563,17 @@ def _snowflake_runner():
                 conn = st.connection("snowflake", private_key=_private_key_der(pem))
             else:    # Local: private_key_file on disk is enough
                 conn = st.connection("snowflake")
-            # Use a plain cursor + fetchall rather than conn.query(), which fetches
-            # via Arrow (fetch_pandas_all). On Cloud's pyarrow the Arrow conversion
-            # fails on constant columns ("Converting strings to null is not
-            # implemented"). fetchall returns the same (rows, columns) the engine
-            # expects and matches the local flat-connector path.
+            # Fetch via a plain cursor in JSON result format. conn.query() (and the
+            # connector's default Arrow result format) decode results through
+            # pyarrow; on Cloud's pyarrow that decode fails on constant columns
+            # ("Converting strings to null is not implemented"). Forcing JSON takes
+            # pyarrow out of the path entirely. fetchall then returns the same
+            # (rows, columns) the engine expects, matching the local path.
             cur = conn.cursor()
             try:
+                cur.execute(
+                    "ALTER SESSION SET PYTHON_CONNECTOR_QUERY_RESULT_FORMAT = 'JSON'"
+                )
                 cur.execute(sql)
                 cols = [c[0] for c in cur.description]
                 data = cur.fetchall()

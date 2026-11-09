@@ -71,8 +71,8 @@ _SQL = """
 SELECT
     pc."EmployeeType"   AS "Employee Type",
     pc."Candidateid"    AS "Candidate ID",
-    ''                  AS "Candidate Name",
-    ''                  AS "Client Company Name",
+    CAST('' AS VARCHAR) AS "Candidate Name",
+    CAST('' AS VARCHAR) AS "Client Company Name",
     0                   AS "Total Hours Paid",
     SUM(COALESCE(pmt."NetAmount", pmt."Amount")) AS "Gross Wages Amount",
     pc."PeriodEndDate"  AS "Billing Period End Date"

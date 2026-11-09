@@ -41,6 +41,12 @@ class SnowflakeStorage(StorageBackend):
         if not conn_params:
             raise ValueError("SnowflakeStorage needs Snowflake connection params.")
         self._params = dict(conn_params)
+        # Force client-side %s binding for THIS connection. On Streamlit Cloud the
+        # native Snowflake integration flips the connector's global paramstyle away
+        # from pyformat, which would send our %s placeholders to Snowflake
+        # unbound ("SQL compilation error ... unexpected '%'"). Pinning it here
+        # keeps every query in this backend self-consistent.
+        self._params.setdefault("paramstyle", "pyformat")
         self._schema = schema.rstrip(".")
         self._audit = f"{self._schema}.COST_RECON_AUDIT"
         self._files = f"{self._schema}.COST_RECON_AUDIT_FILE"

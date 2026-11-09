@@ -29,6 +29,9 @@ venv/
 .pytest_cache/
 .ipynb_checkpoints/
 
+# Scheduled-refresh log (written by run-refresh.ps1; local only)
+refresh_data.log
+
 # OS / editor
 .DS_Store
 Thumbs.db

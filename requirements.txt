@@ -1,9 +1,13 @@
 # Pinned for Streamlit Community Cloud. Streamlit is pinned exactly so a cloud
 # redeploy can't pull a newer version than the code was written against (that has
-# broken render calls on other OakTree apps). pandas/openpyxl are bounded below
-# the next major so they stay installable across the cloud's Python version.
+# broken render calls on other OakTree apps). openpyxl is bounded below the next
+# major so it stays installable across the cloud's Python version.
 streamlit==1.56.0
-pandas>=2.2,<3.1
+# pandas MUST stay < 3.0: pandas 3.0 makes pyarrow-backed strings the default
+# dtype, which routes string columns through pyarrow and raises "Converting
+# strings to null is not implemented" during DataFrame construction on Cloud.
+# The app is developed/validated on pandas 2.x; keep Cloud on the same major.
+pandas>=2.2,<3
 openpyxl>=3.1,<4
 
 # Bullhorn is pulled live from BULLHORN_MIRROR (Snowflake), and saved audit

@@ -67,6 +67,15 @@ CTS_WEEKLY_PAYCYCLE = "CTS-Weekly"
 # reversals, and voided charges (see the module docstring). COALESCE falls back
 # to Amount only if NetAmount is ever NULL (none are in practice). The charge
 # header still supplies the entity / period / type context for filter + grouping.
+#
+# EntryTypeid IN (1, 2): include BOTH "Timesheet" (1) and "Expense Report" (2)
+# charges. Expenses are billed inconsistently in Bullhorn — some are keyed on the
+# timesheet (type 1) and some submitted as an expense report (type 2). Payroll
+# pays both (register "Expense Reimbur Dollars"), so the payable side must include
+# both to reconcile against Total Earnings; filtering to type 1 alone dropped the
+# expense-report reimbursements and showed phantom variances (Rachel Redekopp /
+# Christopher Simmons, Oct 2026). Expense reports are essentially OTS-only (CTS has
+# 1 such charge all-time), so this does not disturb the CTS baseline.
 _SQL = """
 SELECT
     pc."EmployeeType"   AS "Employee Type",
@@ -82,7 +91,7 @@ JOIN BULLHORN_MIRROR.RAW."PayMaster" pm
 JOIN BULLHORN_MIRROR.RAW."PayMasterTransaction" pmt
     ON pmt."PayMasterID" = pm."ID"
 WHERE {entity_clause}
-  AND pc."EntryTypeid" = 1
+  AND pc."EntryTypeid" IN (1, 2)
   AND pc."PeriodEndDate" BETWEEN '{start}' AND '{end}'
   AND COALESCE(pmt."IsDeleted", FALSE) = FALSE
 GROUP BY pc."EmployeeType", pc."Candidateid", pc."PeriodEndDate"

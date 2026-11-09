@@ -133,7 +133,8 @@ def test_bullhorn_c2c_parser(tmp_path):
 def test_build_query_routes_entity_and_window():
     sql = sf.build_query("OTS", 2026, 8, periods.SCHEDULE_BIWEEKLY)
     assert "\"Branch\" = 'OTS'" in sql
-    assert "EntryTypeid" in sql and "= 1" in sql
+    # Include both Timesheet (1) and Expense Report (2) charges.
+    assert "EntryTypeid" in sql and "IN (1, 2)" in sql
     # Bi-weekly uses a 16-day buffer around the month.
     assert "'2026-07-16'" in sql and "'2026-09-16'" in sql
 

@@ -563,8 +563,19 @@ def _snowflake_runner():
                 conn = st.connection("snowflake", private_key=_private_key_der(pem))
             else:    # Local: private_key_file on disk is enough
                 conn = st.connection("snowflake")
-            df = conn.query(sql, ttl=0)
-            return list(df.itertuples(index=False, name=None)), list(df.columns)
+            # Use a plain cursor + fetchall rather than conn.query(), which fetches
+            # via Arrow (fetch_pandas_all). On Cloud's pyarrow the Arrow conversion
+            # fails on constant columns ("Converting strings to null is not
+            # implemented"). fetchall returns the same (rows, columns) the engine
+            # expects and matches the local flat-connector path.
+            cur = conn.cursor()
+            try:
+                cur.execute(sql)
+                cols = [c[0] for c in cur.description]
+                data = cur.fetchall()
+            finally:
+                cur.close()
+            return data, cols
         return runner, "connections.snowflake"
     if has_flat:
         params = dict(st.secrets["snowflake"])

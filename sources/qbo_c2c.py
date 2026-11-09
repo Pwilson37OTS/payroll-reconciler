@@ -5,13 +5,21 @@ vendor LLC. This reads a C2C export from the payroll folder and returns per-row
 records the app maps to a Bullhorn candidate, to use as the "paid" side for
 Corp-Corp people in the reconciliation.
 
-Two export shapes are supported (auto-detected):
+Three export shapes are supported (auto-detected):
 
 * **QuickBooks Transaction Detail** (e.g. ``CTS - C2C.xlsx``) — one row per bill
   line; the Bullhorn Placement ID and name are embedded in the Description
   (``"<placementId>, <Name>, <date>, <hrs>, <rate>"``). No candidate id, so the
   app resolves placement -> candidate via Bullhorn.
-* **Bullhorn C2C export** (e.g. ``OTS - C2C.xlsx``) — columns include
+* **QuickBooks AP "C2C Audit Report"** (current ``C2C - OTS.xlsx``) — a broad
+  vendor-bill export with a title block then ``Date, Due date, Bill number,
+  Vendor, Line description, Amount, Paid status, ..., Item class``. The placement
+  id, name and work date live in ``Line description`` in the same
+  ``"<placementId>, <Name>, <date>, <hrs>, <rate>"`` format. Only rows carrying a
+  placement id are kept (labor + expense, all-in); name-only expense lines and
+  overhead/benefits rows (no placement id) are skipped. Paid and Unpaid both
+  count. Month attribution uses the Line-description work date.
+* **Bullhorn C2C export** (legacy ``OTS - C2C.xlsx``) — columns include
   ``Candidate ID``, ``Placement ID``, ``Name``, ``Period End Date`` and
   ``Payroll Amount`` directly (no parsing / mapping needed).
 """
@@ -199,9 +207,58 @@ def parse_c2c(path: str) -> tuple[list[dict], str | None]:
             })
         return records, period
 
+    # --- QuickBooks AP "C2C Audit Report" (vendor bill lines) ---
+    # A broad A/P export with a title block, then columns: Date, Due date, Bill
+    # number, Vendor, Line description, Amount, Paid status, ..., Item class.
+    # Contractor identity + work date are embedded in "Line description" exactly
+    # like the Transaction-Detail "Description": "<placementId>, <Name>, <date>,
+    # <hours>, <rate>". Per Phil (2026-11): include ONLY rows that carry a
+    # placement id (the staffing cost — labor + expense, all-in); skip name-only
+    # expense lines and overhead/benefits (Delta Dental, Blue Cross, background
+    # checks) which have no placement id. Month attribution uses the Line
+    # description's work date. Paid AND Unpaid bills both count.
+    ap = header_index("line description", "amount")
+    if ap is not None:
+        header = [str(c).strip() if c is not None else "" for c in rows[ap]]
+        col = {h.lower(): j for j, h in enumerate(header)}
+        di, ai = col.get("line description"), col.get("amount")
+        bdi = col.get("date")  # bill date — fallback only if the work date is bad
+        period = None
+        for r in rows[:ap]:
+            for c in r:
+                if isinstance(c, str) and _PERIOD_RE.match(c.strip()):
+                    period = c.strip()
+        records = []
+        for r in rows[ap + 1:]:
+            raw = r[di] if di is not None and di < len(r) else None
+            # A leading apostrophe (Excel text-forcing) sometimes rides along.
+            desc = str(raw).lstrip("'").strip() if raw is not None else None
+            d = _parse_desc(desc)
+            if d["placement_id"] is None:
+                continue  # only placement-tagged contractor bill lines
+            amt = _amount(r[ai]) if ai is not None and ai < len(r) else None
+            if amt is None:
+                continue
+            period_end = periods.to_ts(d["work_date"])
+            if period_end is None or pd.isna(period_end):
+                period_end = periods.to_ts(r[bdi] if bdi is not None and bdi < len(r) else None)
+            records.append({
+                "candidate_id": None,
+                "placement_id": d["placement_id"],
+                "name": d["name"],
+                "amount": amt,
+                "period_end": period_end,
+                "work_date": d["work_date"], "hours": d["hours"], "rate": d["rate"],
+                # All-in C2C cost (labor + expense); this export has no per-account
+                # split, so everything tagged to the placement is the staffing cost.
+                "account": None, "kind": "wage",
+            })
+        return records, period
+
     raise ValueError(
-        f"{os.path.basename(path)} isn't a recognized C2C export (needs either "
-        "'Candidate ID'+'Payroll Amount' or 'Transaction date'+'Amount' columns)."
+        f"{os.path.basename(path)} isn't a recognized C2C export (needs "
+        "'Candidate ID'+'Payroll Amount', 'Transaction date'+'Amount', or "
+        "'Line description'+'Amount' columns)."
     )
 
 

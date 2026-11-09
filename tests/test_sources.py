@@ -130,6 +130,47 @@ def test_bullhorn_c2c_parser(tmp_path):
     assert records[0]["period_end"] is not None
 
 
+def test_c2c_audit_report_parser(tmp_path):
+    # The current OTS shape: a QuickBooks AP "C2C Audit Report" with a title block,
+    # then bill-line columns. Placement id + work date live in "Line description".
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.append(["OakTree Software, Inc."])
+    ws.append(["C2C Audit Report"])
+    ws.append(["April-October, 2026"])
+    ws.append([])
+    ws.append(["Date", "Due date", "Bill number", "Vendor", "Line description",
+               "Amount", "Paid status", "Vendor terms", "Line Order", "Item class"])
+    # Labor line — bill Date (10/20) deliberately differs from the work date in the
+    # description (10/04) to prove month attribution uses the description's date.
+    ws.append(["10/20/2026", "10/31/2026", "OT-0022", "Aladdin Services, LLC",
+               "3055, Wesley Qualls, 10/04/2026, 45.000000, 330.000000",
+               14850, "Paid", "", 2, "PR-Miscellaneous"])
+    # Expense line, Unpaid — must still be counted.
+    ws.append(["10/20/2026", "10/31/2026", "OT-0022", "American Express",
+               "3055, Wesley Qualls, 10/11/2026, 1.000000, 25.430000",
+               25.43, "Unpaid", "", 3, "Qualls, Wesley"])
+    # Name-only expense (no placement id) — excluded.
+    ws.append(["10/11/2026", "10/31/2026", "AX", "American Express",
+               "AX - BECKHAM JORDAN PREPYMT", 500, "Paid", "", 2, "Jordan, Beckham"])
+    # Overhead / benefits (no placement id) — excluded.
+    ws.append(["10/01/2026", "10/31/2026", "INV1", "Delta Dental Plan of Oklahoma",
+               "INV #103901", 1000, "Paid", "", 2, "PR-IT"])
+    f = tmp_path / "C2C - OTS.xlsx"
+    wb.save(f)
+
+    records, _ = qbo_c2c.parse_c2c(str(f))
+    # Only the two placement-tagged rows survive (name-only + overhead dropped).
+    assert len(records) == 2
+    assert all(r["placement_id"] == "3055" for r in records)
+    assert all(r["candidate_id"] is None for r in records)  # resolved via placement map
+    # Paid + Unpaid both counted.
+    assert sum(r["amount"] for r in records) == 14875.43
+    # Month attribution uses the Line-description work date, not the bill Date.
+    labor = next(r for r in records if r["amount"] == 14850)
+    assert str(labor["period_end"])[:10] == "2026-10-04"
+
+
 def test_build_query_routes_entity_and_window():
     sql = sf.build_query("OTS", 2026, 8, periods.SCHEDULE_BIWEEKLY)
     assert "\"Branch\" = 'OTS'" in sql
